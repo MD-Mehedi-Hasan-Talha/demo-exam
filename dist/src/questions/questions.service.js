@@ -18,6 +18,108 @@ let QuestionsService = class QuestionsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    async createQuestion(payload) {
+        const normalizedSubjectIds = Array.from(new Set(payload.subjectIds ?? []));
+        const normalizedTagIds = Array.from(new Set(payload.tagIds ?? []));
+        const normalizedOrganizationIds = Array.from(new Set(payload.organizationIds ?? []));
+        const normalizedExamSessionIds = Array.from(new Set(payload.examSessionIds ?? []));
+        const primarySubjectId = payload.primarySubjectId ?? normalizedSubjectIds[0];
+        return this.prisma.$transaction(async (tx) => {
+            const question = await tx.question.create({
+                data: {
+                    type: payload.type,
+                    difficulty: payload.difficulty,
+                    language: payload.language ?? client_1.Language.ENGLISH,
+                    status: client_1.QuestionStatus.PUBLISHED,
+                    defaultMarks: payload.defaultMarks ?? 1,
+                    defaultNegMarks: payload.defaultNegMarks ?? 0,
+                    estimatedSeconds: payload.estimatedSeconds,
+                    isPreviousYear: payload.isPreviousYear ?? false,
+                    isModelTest: payload.isModelTest ?? false,
+                    isVerified: payload.isVerified ?? false,
+                    createdBy: payload.createdBy,
+                },
+            });
+            const version = await tx.questionVersion.create({
+                data: {
+                    questionId: question.id,
+                    versionNumber: 1,
+                    isActive: true,
+                    stem: payload.stem,
+                    stemLocal: payload.stemLocal,
+                    explanation: payload.explanation,
+                    explanationLocal: payload.explanationLocal,
+                    options: payload.options,
+                    answer: payload.answer,
+                    createdBy: payload.createdBy,
+                },
+            });
+            await tx.question.update({
+                where: { id: question.id },
+                data: { currentVersionId: version.id },
+            });
+            if (normalizedSubjectIds.length) {
+                const existingSubjects = await tx.subject.findMany({
+                    where: { id: { in: normalizedSubjectIds } },
+                    select: { id: true },
+                });
+                const existingSubjectIds = new Set(existingSubjects.map((s) => s.id));
+                const missingIds = normalizedSubjectIds.filter((id) => !existingSubjectIds.has(id));
+                if (missingIds.length) {
+                    throw new common_1.BadRequestException(`The following subjectIds do not exist: ${missingIds.join(', ')}`);
+                }
+                await tx.questionSubject.createMany({
+                    data: normalizedSubjectIds.map((subjectId) => ({
+                        questionId: question.id,
+                        subjectId,
+                        isPrimary: subjectId === primarySubjectId,
+                    })),
+                });
+            }
+            if (normalizedTagIds.length) {
+                await tx.questionTag.createMany({
+                    data: normalizedTagIds.map((tagId) => ({
+                        questionId: question.id,
+                        tagId,
+                    })),
+                });
+            }
+            if (normalizedOrganizationIds.length) {
+                await tx.questionOrganization.createMany({
+                    data: normalizedOrganizationIds.map((organizationId) => ({
+                        questionId: question.id,
+                        organizationId,
+                    })),
+                });
+            }
+            if (normalizedExamSessionIds.length) {
+                await tx.questionExamSession.createMany({
+                    data: normalizedExamSessionIds.map((examSessionId) => ({
+                        questionId: question.id,
+                        examSessionId,
+                    })),
+                });
+            }
+            return tx.question.findUnique({
+                where: { id: question.id },
+                include: {
+                    currentVersion: {
+                        select: {
+                            stem: true,
+                            stemLocal: true,
+                            explanation: true,
+                            options: true,
+                            answer: true,
+                        },
+                    },
+                    subjects: true,
+                    tags: true,
+                    organizations: true,
+                    examSessions: true,
+                },
+            });
+        });
+    }
     async filterQuestions(query) {
         const take = this.parseTake(query.take);
         const userId = query.userId;

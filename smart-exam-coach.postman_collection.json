@@ -40,6 +40,31 @@
       "name": "Questions",
       "item": [
         {
+          "name": "Create Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"MCQ_SINGLE\",\n  \"difficulty\": \"MEDIUM\",\n  \"language\": \"ENGLISH\",\n  \"stem\": \"What is 2 + 2?\",\n  \"stemLocal\": \"2 + 2 কত?\",\n  \"explanation\": \"Basic arithmetic\",\n  \"options\": [\n    { \"id\": \"A\", \"text\": \"3\", \"isCorrect\": false },\n    { \"id\": \"B\", \"text\": \"4\", \"isCorrect\": true },\n    { \"id\": \"C\", \"text\": \"5\", \"isCorrect\": false },\n    { \"id\": \"D\", \"text\": \"6\", \"isCorrect\": false }\n  ],\n  \"answer\": { \"correctOptionId\": \"B\" },\n  \"defaultMarks\": 1,\n  \"defaultNegMarks\": 0.25,\n  \"estimatedSeconds\": 45,\n  \"isPreviousYear\": false,\n  \"isModelTest\": false,\n  \"isVerified\": true,\n  \"subjectIds\": [\"subject_id_here\"],\n  \"primarySubjectId\": \"subject_id_here\",\n  \"tagIds\": [\"tag_id_here\"],\n  \"organizationIds\": [\"organization_id_here\"],\n  \"examSessionIds\": [\"exam_session_id_here\"],\n  \"createdBy\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/questions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "questions"
+              ]
+            }
+          }
+        },
+        {
           "name": "Filter Questions",
           "request": {
             "method": "GET",

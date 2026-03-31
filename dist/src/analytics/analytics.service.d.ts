@@ -5,6 +5,8 @@ export declare class AnalyticsService {
     constructor(prisma: PrismaService);
     refreshQuestionAnalytics(payload: RefreshQuestionAnalyticsDto): Promise<{
         updated: number;
+        skipped: number;
+        skippedQuestionIds: string[];
     }>;
     mostSolved(limit?: number): Promise<({
         question: {

@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QuestionsController = void 0;
 const common_1 = require("@nestjs/common");
+const create_question_dto_1 = require("./dto/create-question.dto");
 const filter_questions_query_dto_1 = require("./dto/filter-questions-query.dto");
 const questions_service_1 = require("./questions.service");
 let QuestionsController = class QuestionsController {
@@ -21,11 +22,21 @@ let QuestionsController = class QuestionsController {
     constructor(questionsService) {
         this.questionsService = questionsService;
     }
+    createQuestion(payload) {
+        return this.questionsService.createQuestion(payload);
+    }
     filterQuestions(query) {
         return this.questionsService.filterQuestions(query);
     }
 };
 exports.QuestionsController = QuestionsController;
+__decorate([
+    (0, common_1.Post)(),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_question_dto_1.CreateQuestionDto]),
+    __metadata("design:returntype", void 0)
+], QuestionsController.prototype, "createQuestion", null);
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)()),

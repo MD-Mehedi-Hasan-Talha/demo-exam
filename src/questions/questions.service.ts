@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   DifficultyLevel,
   Language,
@@ -7,6 +7,7 @@ import {
   QuestionType,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateQuestionDto } from './dto/create-question.dto';
 import { FilterQuestionsQueryDto } from './dto/filter-questions-query.dto';
 
 type QuestionCard = {
@@ -28,6 +29,126 @@ type QuestionCard = {
 @Injectable()
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async createQuestion(payload: CreateQuestionDto) {
+    const normalizedSubjectIds = Array.from(new Set(payload.subjectIds ?? []));
+    const normalizedTagIds = Array.from(new Set(payload.tagIds ?? []));
+    const normalizedOrganizationIds = Array.from(
+      new Set(payload.organizationIds ?? []),
+    );
+    const normalizedExamSessionIds = Array.from(
+      new Set(payload.examSessionIds ?? []),
+    );
+    const primarySubjectId = payload.primarySubjectId ?? normalizedSubjectIds[0];
+
+    return this.prisma.$transaction(async (tx) => {
+      const question = await tx.question.create({
+        data: {
+          type: payload.type,
+          difficulty: payload.difficulty,
+          language: payload.language ?? Language.ENGLISH,
+          status: QuestionStatus.PUBLISHED,
+          defaultMarks: payload.defaultMarks ?? 1,
+          defaultNegMarks: payload.defaultNegMarks ?? 0,
+          estimatedSeconds: payload.estimatedSeconds,
+          isPreviousYear: payload.isPreviousYear ?? false,
+          isModelTest: payload.isModelTest ?? false,
+          isVerified: payload.isVerified ?? false,
+          createdBy: payload.createdBy,
+        },
+      });
+
+      const version = await tx.questionVersion.create({
+        data: {
+          questionId: question.id,
+          versionNumber: 1,
+          isActive: true,
+          stem: payload.stem,
+          stemLocal: payload.stemLocal,
+          explanation: payload.explanation,
+          explanationLocal: payload.explanationLocal,
+          options: payload.options as Prisma.InputJsonValue,
+          answer: payload.answer as Prisma.InputJsonValue,
+          createdBy: payload.createdBy,
+        },
+      });
+
+      await tx.question.update({
+        where: { id: question.id },
+        data: { currentVersionId: version.id },
+      });
+
+      if (normalizedSubjectIds.length) {
+        const existingSubjects = await tx.subject.findMany({
+          where: { id: { in: normalizedSubjectIds } },
+          select: { id: true },
+        });
+        const existingSubjectIds = new Set(existingSubjects.map((s) => s.id));
+        const missingIds = normalizedSubjectIds.filter(
+          (id) => !existingSubjectIds.has(id),
+        );
+        if (missingIds.length) {
+          throw new BadRequestException(
+            `The following subjectIds do not exist: ${missingIds.join(', ')}`,
+          );
+        }
+
+        await tx.questionSubject.createMany({
+          data: normalizedSubjectIds.map((subjectId) => ({
+            questionId: question.id,
+            subjectId,
+            isPrimary: subjectId === primarySubjectId,
+          })),
+        });
+      }
+
+      if (normalizedTagIds.length) {
+        await tx.questionTag.createMany({
+          data: normalizedTagIds.map((tagId) => ({
+            questionId: question.id,
+            tagId,
+          })),
+        });
+      }
+
+      if (normalizedOrganizationIds.length) {
+        await tx.questionOrganization.createMany({
+          data: normalizedOrganizationIds.map((organizationId) => ({
+            questionId: question.id,
+            organizationId,
+          })),
+        });
+      }
+
+      if (normalizedExamSessionIds.length) {
+        await tx.questionExamSession.createMany({
+          data: normalizedExamSessionIds.map((examSessionId) => ({
+            questionId: question.id,
+            examSessionId,
+          })),
+        });
+      }
+
+      return tx.question.findUnique({
+        where: { id: question.id },
+        include: {
+          currentVersion: {
+            select: {
+              stem: true,
+              stemLocal: true,
+              explanation: true,
+              options: true,
+              answer: true,
+            },
+          },
+          subjects: true,
+          tags: true,
+          organizations: true,
+          examSessions: true,
+        },
+      });
+    });
+  }
 
   async filterQuestions(query: FilterQuestionsQueryDto) {
     const take = this.parseTake(query.take);

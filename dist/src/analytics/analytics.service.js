@@ -28,7 +28,15 @@ let AnalyticsService = class AnalyticsService {
                 orderBy: [{ updatedAt: 'desc' }],
                 select: { id: true },
             })).map((row) => row.id);
-        for (const questionId of sourceQuestionIds) {
+        const uniqueQuestionIds = Array.from(new Set(sourceQuestionIds));
+        const existingRows = await this.prisma.question.findMany({
+            where: { id: { in: uniqueQuestionIds } },
+            select: { id: true },
+        });
+        const existingIds = new Set(existingRows.map((row) => row.id));
+        const validQuestionIds = uniqueQuestionIds.filter((id) => existingIds.has(id));
+        const skippedQuestionIds = uniqueQuestionIds.filter((id) => !existingIds.has(id));
+        for (const questionId of validQuestionIds) {
             const [attemptAgg, bookmarkCount] = await Promise.all([
                 this.prisma.questionAttempt.aggregate({
                     where: { questionId },
@@ -79,7 +87,11 @@ let AnalyticsService = class AnalyticsService {
                 }),
             ]);
         }
-        return { updated: sourceQuestionIds.length };
+        return {
+            updated: validQuestionIds.length,
+            skipped: skippedQuestionIds.length,
+            skippedQuestionIds,
+        };
     }
     async mostSolved(limit = 20) {
         return this.prisma.questionAnalytics.findMany({

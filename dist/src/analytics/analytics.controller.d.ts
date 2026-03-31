@@ -5,6 +5,8 @@ export declare class AnalyticsController {
     constructor(analyticsService: AnalyticsService);
     refreshQuestionAnalytics(payload: RefreshQuestionAnalyticsDto): Promise<{
         updated: number;
+        skipped: number;
+        skippedQuestionIds: string[];
     }>;
     mostSolved(limit?: number): Promise<({
         question: {
