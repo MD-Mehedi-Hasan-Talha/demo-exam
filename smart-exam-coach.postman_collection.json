@@ -1,0 +1,914 @@
+{
+  "info": {
+    "name": "Smart Exam Coach API",
+    "_postman_id": "7b7cb775-0ad4-4f06-9b54-3e8ca8af3f34",
+    "description": "Postman collection for implemented NestJS modules: questions, practice, mock-test, progress, question-sets, analytics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "userId",
+      "value": "user_demo_1"
+    },
+    {
+      "key": "questionId",
+      "value": "question_id_here"
+    },
+    {
+      "key": "sessionId",
+      "value": "practice_session_id_here"
+    },
+    {
+      "key": "examId",
+      "value": "exam_id_here"
+    },
+    {
+      "key": "attemptId",
+      "value": "attempt_id_here"
+    },
+    {
+      "key": "setId",
+      "value": "practice_set_id_here"
+    }
+  ],
+  "item": [
+    {
+      "name": "Questions",
+      "item": [
+        {
+          "name": "Filter Questions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/questions?userId={{userId}}&subjectIds=sub1,sub2&tagIds=tag1,tag2&organizationIds=org1&examSessionIds=es1&difficulty=MEDIUM&type=MCQ_SINGLE&language=ENGLISH&solved=false&bookmarked=false&isPreviousYear=true&isModelTest=false&take=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "questions"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "subjectIds",
+                  "value": "sub1,sub2"
+                },
+                {
+                  "key": "tagIds",
+                  "value": "tag1,tag2"
+                },
+                {
+                  "key": "organizationIds",
+                  "value": "org1"
+                },
+                {
+                  "key": "examSessionIds",
+                  "value": "es1"
+                },
+                {
+                  "key": "difficulty",
+                  "value": "MEDIUM"
+                },
+                {
+                  "key": "type",
+                  "value": "MCQ_SINGLE"
+                },
+                {
+                  "key": "language",
+                  "value": "ENGLISH"
+                },
+                {
+                  "key": "solved",
+                  "value": "false"
+                },
+                {
+                  "key": "bookmarked",
+                  "value": "false"
+                },
+                {
+                  "key": "isPreviousYear",
+                  "value": "true"
+                },
+                {
+                  "key": "isModelTest",
+                  "value": "false"
+                },
+                {
+                  "key": "take",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Practice",
+      "item": [
+        {
+          "name": "Create Practice Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"mode\": \"WEAK_AREA\",\n  \"take\": 20,\n  \"subjectIds\": [\"sub1\"],\n  \"tagIds\": [\"tag1\"],\n  \"examSessionIds\": [\"es1\"],\n  \"organizationIds\": [\"org1\"],\n  \"difficulty\": \"MEDIUM\",\n  \"language\": \"ENGLISH\",\n  \"timedSeconds\": 1800\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/practice/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "practice",
+                "sessions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Next Practice Question",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/practice/sessions/{{sessionId}}/next?userId={{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "practice",
+                "sessions",
+                "{{sessionId}}",
+                "next"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Answer Practice Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"questionId\": \"{{questionId}}\",\n  \"status\": \"CORRECT\",\n  \"selectedAnswer\": { \"optionId\": \"A\" },\n  \"timeSpent\": 42\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/practice/sessions/{{sessionId}}/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "practice",
+                "sessions",
+                "{{sessionId}}",
+                "answer"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Complete Practice Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/practice/sessions/{{sessionId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "practice",
+                "sessions",
+                "{{sessionId}}",
+                "complete"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mock Tests",
+      "item": [
+        {
+          "name": "Create Mock Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"BCS Full Mock 01\",\n  \"createdBy\": \"admin_1\",\n  \"mode\": \"MOCK\",\n  \"totalDuration\": 3600,\n  \"totalMarks\": 100,\n  \"passMark\": 40,\n  \"shuffleQuestions\": true,\n  \"rules\": [\n    {\n      \"subjectId\": \"sub1\",\n      \"difficulty\": \"MEDIUM\",\n      \"questionType\": \"MCQ_SINGLE\",\n      \"questionCount\": 20,\n      \"marks\": 1,\n      \"negMarks\": 0.25,\n      \"fromPreviousYear\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mock-tests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mock-tests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Mock Test Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mock-tests/{{examId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mock-tests",
+                "{{examId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Start Mock Attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mock-tests/{{examId}}/attempts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mock-tests",
+                "{{examId}}",
+                "attempts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Submit Mock Attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\n      \"examItemId\": \"exam_item_1\",\n      \"questionId\": \"{{questionId}}\",\n      \"selectedAnswer\": { \"optionId\": \"B\" },\n      \"status\": \"CORRECT\",\n      \"timeSpent\": 35\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mock-tests/{{examId}}/attempts/{{attemptId}}/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mock-tests",
+                "{{examId}}",
+                "attempts",
+                "{{attemptId}}",
+                "submit"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Mock Leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mock-tests/{{examId}}/leaderboard?take=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mock-tests",
+                "{{examId}}",
+                "leaderboard"
+              ],
+              "query": [
+                {
+                  "key": "take",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Progress",
+      "item": [
+        {
+          "name": "Upsert Bookmark",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"questionId\": \"{{questionId}}\",\n  \"reason\": \"REVISIT\",\n  \"note\": \"Need to revise this concept\",\n  \"tags\": [\"formula\", \"important\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/progress/bookmarks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "bookmarks"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove Bookmark",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/progress/bookmarks/{{questionId}}?userId={{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "bookmarks",
+                "{{questionId}}"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Bookmarks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/progress/bookmarks?userId={{userId}}&take=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "bookmarks"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "take",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Weak Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"questionId\": \"{{questionId}}\",\n  \"weak\": true,\n  \"nextRevisionDays\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/progress/weak",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "weak"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Revision Queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/progress/revision-queue?userId={{userId}}&take=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "revision-queue"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "take",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Question Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/progress/question-status?userId={{userId}}&questionIds=q1,q2,q3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "question-status"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "questionIds",
+                  "value": "q1,q2,q3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Log Daily Activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"solvedCount\": 20,\n  \"correctCount\": 14,\n  \"skippedCount\": 3,\n  \"timeSpent\": 1800,\n  \"activeMinutes\": 35\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/progress/daily-activity",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "daily-activity"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Streak",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/progress/streak?userId={{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "progress",
+                "streak"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Question Sets",
+      "item": [
+        {
+          "name": "Create Practice Set",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Physics Chapter 1 Set\",\n  \"description\": \"Basic chapter practice\",\n  \"type\": \"CHAPTER_SET\",\n  \"createdBy\": \"{{userId}}\",\n  \"visibility\": \"PRIVATE\",\n  \"totalMarks\": 50,\n  \"timeLimit\": 1800,\n  \"estimatedDifficulty\": \"EASY\",\n  \"questionIds\": [\"q1\", \"q2\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/question-sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Generate Practice Set",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Generated BCS PYQ Set\",\n  \"createdBy\": \"{{userId}}\",\n  \"type\": \"YEARLY\",\n  \"take\": 30,\n  \"subjectIds\": [\"sub1\"],\n  \"tagIds\": [\"tag1\"],\n  \"examSessionIds\": [\"es1\"],\n  \"organizationIds\": [\"org1\"],\n  \"difficulty\": \"MEDIUM\",\n  \"questionType\": \"MCQ_SINGLE\",\n  \"language\": \"ENGLISH\",\n  \"isPreviousYear\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/question-sets/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets",
+                "generate"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Practice Set Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionIds\": [\"q3\", \"q4\"],\n  \"marks\": 1,\n  \"negMarks\": 0.25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/question-sets/{{setId}}/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets",
+                "{{setId}}",
+                "items"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Set Workflow",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workflowStatus\": \"PUBLISHED\",\n  \"reviewedBy\": \"admin_1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/question-sets/{{setId}}/workflow",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets",
+                "{{setId}}",
+                "workflow"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Practice Sets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/question-sets?createdBy={{userId}}&type=CHAPTER_SET&visibility=PRIVATE&workflowStatus=DRAFT&take=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets"
+              ],
+              "query": [
+                {
+                  "key": "createdBy",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "type",
+                  "value": "CHAPTER_SET"
+                },
+                {
+                  "key": "visibility",
+                  "value": "PRIVATE"
+                },
+                {
+                  "key": "workflowStatus",
+                  "value": "DRAFT"
+                },
+                {
+                  "key": "take",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Practice Set Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/question-sets/{{setId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "question-sets",
+                "{{setId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Refresh Question Analytics",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionIds\": [\"q1\", \"q2\"],\n  \"take\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/analytics/refresh/questions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "refresh",
+                "questions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Most Solved Questions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/questions/most-solved?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "questions",
+                "most-solved"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Most Difficult Questions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/questions/most-difficult?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "questions",
+                "most-difficult"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Trending Topics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/topics/trending?limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "topics",
+                "trending"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Weak Subjects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/users/weak-subjects?userId={{userId}}&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "users",
+                "weak-subjects"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Performance Heatmap",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/users/performance-heatmap?userId={{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "users",
+                "performance-heatmap"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Chapter Strength",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/users/chapter-strength?userId={{userId}}&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "users",
+                "chapter-strength"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

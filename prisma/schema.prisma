@@ -1,0 +1,782 @@
+// ============================================================
+// PRISMA SCHEMA — Smart Exam Coach
+// Optimized for: large-scale filtering, millions of questions,
+// analytics pipelines, AI personalization readiness
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum QuestionType {
+  MCQ_SINGLE       // Single correct answer
+  MCQ_MULTI        // Multiple correct answers
+  CQ               // Creative/structured question
+  SHORT_ANSWER     // One-liner written
+  LONG_ANSWER      // Essay / descriptive
+  TRUE_FALSE
+  FILL_IN_BLANK
+  MATCHING
+  ORDERING
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+enum SubjectLevel {
+  ACADEMY          // Top-level: e.g. Academic, Competitive
+  CLASS            // e.g. Class 8, HSC, BCS
+  GROUP            // e.g. Science, Arts, Commerce
+  SUBJECT          // e.g. Physics, Math
+  CHAPTER
+  TOPIC
+  SUBTOPIC
+}
+
+enum ExamMode {
+  PRACTICE
+  MOCK
+  LIVE
+  REAL_SIMULATION
+  SMART_ADAPTIVE
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SCHEDULED
+}
+
+enum QuestionStatus {
+  DRAFT
+  PUBLISHED
+  UNDER_REVIEW
+  DEPRECATED
+  ARCHIVED
+}
+
+enum Language {
+  BANGLA
+  ENGLISH
+  BOTH
+}
+
+enum AttemptStatus {
+  CORRECT
+  INCORRECT
+  SKIPPED
+  PARTIAL
+}
+
+enum BookmarkReason {
+  DIFFICULT
+  IMPORTANT
+  REVISIT
+  CONFUSING
+  FAVORITE
+  CUSTOM
+}
+
+enum PracticeMode {
+  TOPIC_WISE
+  EXAM_WISE
+  MIXED
+  WEAK_AREA
+  DIFFICULTY_BASED
+  TIMED
+  ADAPTIVE
+}
+
+enum PracticeSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum PracticeSetVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum PracticeSetWorkflowStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================================
+// SUBJECT HIERARCHY
+// Self-referential tree — unlimited depth
+// ============================================================
+
+model Subject {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  name        String
+  nameLocal   String?      // Bangla name
+  level       SubjectLevel
+  description String?
+  icon        String?
+  color       String?
+  isShared    Boolean      @default(false) // Shared across groups
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  metadata    Json?        // extensible: syllabusYear, boardCode, etc.
+
+  // Self-referential hierarchy
+  parentId    String?
+  parent      Subject?     @relation("SubjectTree", fields: [parentId], references: [id])
+  children    Subject[]    @relation("SubjectTree")
+
+  // Relations
+  questions         QuestionSubject[]
+  examSubjects      ExamSubject[]
+  userProgress      UserSubjectProgress[]
+  topicWeights      TopicWeight[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([parentId])
+  @@index([level])
+  @@index([isActive, level])
+  @@index([slug])
+}
+
+// ============================================================
+// ORGANIZATION / BOARD / INSTITUTION
+// ============================================================
+
+model Organization {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  nameLocal   String?
+  type        String    // BOARD, UNIVERSITY, COACHING, COMPETITIVE_BODY
+  country     String    @default("BD")
+  isActive    Boolean   @default(true)
+  metadata    Json?
+
+  examSessions  ExamSession[]
+  questions     QuestionOrganization[]
+  exams         Exam[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([type, isActive])
+}
+
+// ============================================================
+// EXAM SESSION / YEAR
+// e.g. BCS 45, HSC 2024, BUET 2023
+// ============================================================
+
+model ExamSession {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String       // "BCS 45th", "HSC 2024"
+  code           String?      // "BCS-45", "HSC-2024"
+  year           Int
+  month          Int?
+  isActive       Boolean      @default(true)
+  metadata       Json?
+
+  questions  QuestionExamSession[]
+  exams      Exam[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, year])
+  @@index([year])
+}
+
+// ============================================================
+// TAG SYSTEM
+// Concept-level, cross-disciplinary tagging
+// ============================================================
+
+model Tag {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  nameLocal   String?
+  category    String    // CONCEPT, SKILL, TOPIC_ALIAS, KEYWORD, INTERDISCIPLINARY
+  isActive    Boolean   @default(true)
+  usageCount  Int       @default(0) // denormalized counter for performance
+
+  questions   QuestionTag[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([category, isActive])
+  @@index([usageCount])        // Sort by trending tags
+}
+
+// ============================================================
+// QUESTION — Core model
+// Central entity; all filtering dimensions attach here
+// ============================================================
+
+model Question {
+  id              String          @id @default(cuid())
+  uuid            String          @unique @default(uuid()) // Stable public ID
+  type            QuestionType
+  difficulty      DifficultyLevel
+  language        Language        @default(ENGLISH)
+  status          QuestionStatus  @default(DRAFT)
+
+  // Content (versioned separately — see QuestionVersion)
+  currentVersionId String?        @unique
+  currentVersion   QuestionVersion? @relation("ActiveVersion", fields: [currentVersionId], references: [id])
+
+  // Scoring
+  defaultMarks        Float       @default(1)
+  defaultNegMarks     Float       @default(0)
+  estimatedSeconds    Int?        // Estimated solve time
+
+  // Analytics counters (denormalized for read performance)
+  totalAttempts       Int         @default(0)
+  totalCorrect        Int         @default(0)
+  totalBookmarks      Int         @default(0)
+  trendingScore       Float       @default(0) // Computed periodically
+
+  // Flags
+  isVerified          Boolean     @default(false)
+  isMultiSubject      Boolean     @default(false) // Interdisciplinary
+  isPreviousYear      Boolean     @default(false)
+  isAIGenerated       Boolean     @default(false)
+  isModelTest         Boolean     @default(false)
+
+  // Search
+  searchVector        Unsupported("tsvector")? // PostgreSQL full-text
+
+  // Many-to-many relations
+  subjects        QuestionSubject[]
+  tags            QuestionTag[]
+  organizations   QuestionOrganization[]
+  examSessions    QuestionExamSession[]
+  examItems       ExamItem[]
+  versions        QuestionVersion[]      @relation("AllVersions")
+  attempts        QuestionAttempt[]
+  bookmarks       QuestionBookmark[]
+  practiceSetItems PracticeSetItem[]
+  practiceSessionItems PracticeSessionItem[]
+  userStates      UserQuestionState[]
+  analytics       QuestionAnalytics?
+  topicWeights    TopicWeight[]
+
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([type])
+  @@index([difficulty])
+  @@index([status])
+  @@index([language])
+  @@index([isPreviousYear])
+  @@index([isModelTest])
+  @@index([isVerified, status])
+  @@index([trendingScore])
+  @@index([totalAttempts])
+  @@index([createdAt])
+  // Composite indexes for common filter combos
+  @@index([status, difficulty, type])
+  @@index([status, isPreviousYear, difficulty])
+}
+
+// ============================================================
+// QUESTION VERSION
+// Full immutable content history per question
+// ============================================================
+
+model QuestionVersion {
+  id            String    @id @default(cuid())
+  questionId    String
+  question      Question  @relation("AllVersions", fields: [questionId], references: [id])
+  versionNumber Int
+  isActive      Boolean   @default(false)
+
+  // Content
+  stem          String    // Question text
+  stemLocal     String?   // Bangla version
+  explanation   String?   // Answer explanation
+  explanationLocal String?
+  hint          String?
+  imageUrl      String?
+  audioUrl      String?
+
+  // MCQ options stored as JSON for flexibility
+  // [{id, text, textLocal, isCorrect, explanation}]
+  options       Json?
+
+  // For CQ / written — structured content
+  // [{part, marks, sampleAnswer}]
+  parts         Json?
+
+  // Answer
+  answer        Json?     // Supports single, multi, range, text
+
+  changelog     String?
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+
+  activeForQuestion Question? @relation("ActiveVersion")
+
+  @@unique([questionId, versionNumber])
+  @@index([questionId, isActive])
+}
+
+// ============================================================
+// JUNCTION: Question ↔ Subject
+// With positional/weight metadata
+// ============================================================
+
+model QuestionSubject {
+  questionId  String
+  subjectId   String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  isPrimary   Boolean  @default(false) // Primary subject vs. secondary
+  weight      Float    @default(1.0)   // Relevance weight for AI ranking
+
+  @@id([questionId, subjectId])
+  @@index([subjectId])
+  @@index([questionId])
+  @@index([subjectId, isPrimary])
+}
+
+// ============================================================
+// JUNCTION: Question ↔ Tag
+// ============================================================
+
+model QuestionTag {
+  questionId  String
+  tagId       String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  tag         Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  relevance   Float    @default(1.0)  // AI can weight tag relevance
+
+  @@id([questionId, tagId])
+  @@index([tagId])
+  @@index([questionId])
+}
+
+// ============================================================
+// JUNCTION: Question ↔ Organization (Board/Institution)
+// ============================================================
+
+model QuestionOrganization {
+  questionId     String
+  organizationId String
+  question       Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, organizationId])
+  @@index([organizationId])
+}
+
+// ============================================================
+// JUNCTION: Question ↔ ExamSession (Year/Paper)
+// ============================================================
+
+model QuestionExamSession {
+  questionId    String
+  examSessionId String
+  question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  examSession   ExamSession @relation(fields: [examSessionId], references: [id], onDelete: Cascade)
+  questionNo    Int?        // Question number within that paper
+
+  @@id([questionId, examSessionId])
+  @@index([examSessionId])
+}
+
+// ============================================================
+// TOPIC WEIGHT
+// "This topic appears frequently in BCS / HSC"
+// ============================================================
+
+model TopicWeight {
+  id             String       @id @default(cuid())
+  subjectId      String
+  subject        Subject      @relation(fields: [subjectId], references: [id])
+  questionId     String?
+  question       Question?    @relation(fields: [questionId], references: [id])
+  organizationId String?
+  weight         Float        // Frequency/importance weight
+  label          String?      // "High frequency in BCS"
+  metadata       Json?
+
+  @@index([subjectId, organizationId])
+}
+
+// ============================================================
+// PRACTICE SET / QUESTION SET
+// Reusable, curated sets — model tests, chapter sets, etc.
+// ============================================================
+
+model PracticeSet {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  title        String
+  titleLocal   String?
+  description  String?
+  type         String    // CHAPTER_SET, MODEL_TEST, YEARLY, CUSTOM, AI_GENERATED
+  isPublic     Boolean   @default(true)
+  visibility   PracticeSetVisibility   @default(PUBLIC)
+  workflowStatus PracticeSetWorkflowStatus @default(DRAFT)
+  totalMarks   Float?
+  timeLimit    Int?      // Seconds
+  version      Int       @default(1)
+  qualityScore Float?
+  sourceFilterSnapshot Json?
+  estimatedDifficulty DifficultyLevel?
+  publishedAt  DateTime?
+  reviewedBy   String?
+  metadata     Json?
+
+  items        PracticeSetItem[]
+  exams        Exam[]
+
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([type, isPublic])
+}
+
+model PracticeSetItem {
+  id            String      @id @default(cuid())
+  practiceSetId String
+  questionId    String
+  practiceSet   PracticeSet @relation(fields: [practiceSetId], references: [id], onDelete: Cascade)
+  question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sortOrder     Int         @default(0)
+  marks         Float?      // Override default marks
+  negMarks      Float?
+  isRequired    Boolean     @default(true)
+
+  @@unique([practiceSetId, questionId])
+  @@index([practiceSetId, sortOrder])
+}
+
+// ============================================================
+// EXAM
+// ============================================================
+
+model Exam {
+  id             String      @id @default(cuid())
+  slug           String      @unique
+  title          String
+  titleLocal     String?
+  description    String?
+  mode           ExamMode
+  status         ExamStatus  @default(DRAFT)
+
+  // Timing
+  totalDuration  Int?        // Seconds for full exam
+  perQuestionTime Int?       // Seconds per question
+  startsAt       DateTime?
+  endsAt         DateTime?
+
+  // Config
+  totalMarks     Float?
+  passMark       Float?
+  shuffleQuestions Boolean   @default(false)
+  showResult     Boolean     @default(true)
+  allowReview    Boolean     @default(true)
+  isPublic       Boolean     @default(true)
+  maxAttempts    Int?
+
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  examSessionId   String?
+  examSession     ExamSession?  @relation(fields: [examSessionId], references: [id])
+  practiceSetId   String?
+  practiceSet     PracticeSet?  @relation(fields: [practiceSetId], references: [id])
+
+  subjects        ExamSubject[]
+  items           ExamItem[]
+  attempts        ExamAttempt[]
+  rules           ExamRule[]
+
+  createdBy    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([mode, status])
+  @@index([status, startsAt])
+  @@index([organizationId])
+}
+
+model ExamSubject {
+  examId    String
+  subjectId String
+  exam      Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([examId, subjectId])
+  @@index([examId])
+}
+
+// Rules for smart exam generation
+model ExamRule {
+  id             String  @id @default(cuid())
+  examId         String
+  exam           Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subjectId      String?
+  tagId          String?
+  difficulty     DifficultyLevel?
+  questionType   QuestionType?
+  questionCount  Int
+  marks          Float?
+  negMarks       Float?
+  fromPreviousYear Boolean @default(false)
+  metadata       Json?
+
+  @@index([examId])
+}
+
+model ExamItem {
+  id          String   @id @default(cuid())
+  examId      String
+  questionId  String
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sortOrder   Int      @default(0)
+  marks       Float?
+  negMarks    Float?
+  sectionName String?  // Optional section grouping
+
+  attempts    QuestionAttempt[]
+
+  @@unique([examId, questionId])
+  @@index([examId, sortOrder])
+}
+
+// ============================================================
+// EXAM ATTEMPT (User-level)
+// ============================================================
+
+model ExamAttempt {
+  id           String   @id @default(cuid())
+  examId       String
+  userId       String
+  exam         Exam     @relation(fields: [examId], references: [id])
+  attemptNo    Int      @default(1)
+
+  startedAt    DateTime @default(now())
+  submittedAt  DateTime?
+  timeSpent    Int?     // Seconds
+
+  score        Float?
+  totalMarks   Float?
+  percentage   Float?
+  rank         Int?
+  isPassed     Boolean?
+  isCompleted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  questionAttempts QuestionAttempt[]
+
+  @@unique([examId, userId, attemptNo])
+  @@index([examId])
+  @@index([userId])
+  @@index([examId, score])   // For leaderboard queries
+  @@index([userId, createdAt])
+}
+
+// ============================================================
+// QUESTION ATTEMPT (granular per-question tracking)
+// ============================================================
+
+model QuestionAttempt {
+  id             String        @id @default(cuid())
+  examAttemptId  String
+  examItemId     String
+  questionId     String
+  userId         String
+  examAttempt    ExamAttempt   @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+  examItem       ExamItem      @relation(fields: [examItemId], references: [id])
+  question       Question      @relation(fields: [questionId], references: [id])
+
+  selectedAnswer Json?         // What user submitted
+  status         AttemptStatus
+  marksAwarded   Float?
+  timeSpent      Int?          // Seconds on this question
+
+  createdAt      DateTime      @default(now())
+
+  @@index([userId, questionId])          // User history per question
+  @@index([questionId, status])          // Question analytics
+  @@index([userId, status])              // User weakness map
+  @@index([examAttemptId])
+  @@index([userId, createdAt])           // Time-range queries
+}
+
+// ============================================================
+// BOOKMARK
+// ============================================================
+
+model QuestionBookmark {
+  id         String          @id @default(cuid())
+  userId     String
+  questionId String
+  question   Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reason     BookmarkReason  @default(REVISIT)
+  note       String?         // User's personal note
+  tags       String[]        // User-defined label strings
+  isReviewed Boolean         @default(false)
+
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@index([userId, reason])
+  @@index([userId, isReviewed])
+}
+
+// ============================================================
+// USER SUBJECT PROGRESS
+// Aggregated accuracy per subject — powers weak area detection
+// ============================================================
+
+model UserSubjectProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  subjectId      String
+  subject        Subject  @relation(fields: [subjectId], references: [id])
+
+  totalAttempted Int      @default(0)
+  totalCorrect   Int      @default(0)
+  accuracy       Float    @default(0)  // Computed: totalCorrect / totalAttempted
+  lastAttemptAt  DateTime?
+  streak         Int      @default(0)
+
+  // For AI recommendation scoring
+  weaknessScore  Float    @default(0)  // Higher = needs more practice
+
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+  @@index([userId, weaknessScore])    // AI: fetch weakest subjects
+  @@index([userId, accuracy])
+}
+
+// ============================================================
+// QUESTION ANALYTICS SNAPSHOT
+// Periodically materialized — avoids real-time aggregation
+// ============================================================
+
+model QuestionAnalytics {
+  questionId        String   @id
+  question          Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  accuracyRate      Float    @default(0)
+  avgTimeSpent      Float    @default(0)    // Seconds
+  totalAttempts     Int      @default(0)
+  totalCorrect      Int      @default(0)
+  totalBookmarks    Int      @default(0)
+  difficultyDrift   Float    @default(0)    // Actual vs. assigned difficulty delta
+  trendingScore     Float    @default(0)    // Recent activity score
+  lastComputedAt    DateTime @default(now())
+
+  @@index([trendingScore])
+  @@index([accuracyRate])
+  @@index([totalAttempts])
+}
+
+// ============================================================
+// SMART PRACTICE RUNTIME
+// ============================================================
+
+model PracticeSession {
+  id          String                @id @default(cuid())
+  userId      String
+  mode        PracticeMode
+  status      PracticeSessionStatus @default(ACTIVE)
+  config      Json?
+  startedAt   DateTime              @default(now())
+  endedAt     DateTime?
+
+  items       PracticeSessionItem[]
+
+  @@index([userId, status])
+  @@index([userId, startedAt])
+}
+
+model PracticeSessionItem {
+  id                String          @id @default(cuid())
+  practiceSessionId String
+  questionId        String
+  practiceSession   PracticeSession @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  question          Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sortOrder         Int             @default(0)
+  isAnswered        Boolean         @default(false)
+  selectedAnswer    Json?
+  resultStatus      AttemptStatus?
+  timeSpent         Int?
+  answeredAt        DateTime?
+  createdAt         DateTime        @default(now())
+
+  @@unique([practiceSessionId, questionId])
+  @@index([practiceSessionId, sortOrder])
+  @@index([questionId])
+}
+
+model UserQuestionState {
+  id                String    @id @default(cuid())
+  userId            String
+  questionId        String
+  question          Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attemptCount      Int       @default(0)
+  correctCount      Int       @default(0)
+  wrongCount        Int       @default(0)
+  skippedCount      Int       @default(0)
+  lastStatus        AttemptStatus?
+  masteryScore      Float     @default(0)
+  weaknessScore     Float     @default(0)
+  nextRevisionAt    DateTime?
+  lastAttemptAt     DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId, weaknessScore])
+  @@index([userId, nextRevisionAt])
+}
+
+model UserDailyActivity {
+  id            String   @id @default(cuid())
+  userId        String
+  activityDate  DateTime
+  solvedCount   Int      @default(0)
+  correctCount  Int      @default(0)
+  skippedCount  Int      @default(0)
+  timeSpent     Int      @default(0)
+  activeMinutes Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, activityDate])
+  @@index([userId, activityDate])
+}
